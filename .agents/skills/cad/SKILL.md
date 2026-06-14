@@ -72,7 +72,9 @@ Once approved:
    or call pipeline.parts.package_parts({name: solid_or_stl}, "designs/<slug>",
    printers=<N>, assembly_notes="...") from the build script. This writes
    parts/<piece>.stl, PARTS.md (parts list + split-across-printers plan), and
-   parts_preview.html.
+   parts_preview.html. With a PrusaSlicer MK4S config (pipeline/profiles/mk4s.ini),
+   PARTS.md also shows real per-part print time + filament and balances printers
+   by minutes.
 2. Commit and push so the parts list and previews are saved.
 3. Tell the user — in plain language — the pieces and their sizes, which to run on
    each MK4S unit (the plan in PARTS.md), suggested orientation, supports, infill

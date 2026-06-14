@@ -53,7 +53,16 @@ gh api -X POST repos/ramofmt/3d-designs/pages -f build_type=workflow
 https://ramofmt.github.io/3d-designs/designs/<slug>/review.html
 ```
 
-## 4. Codex environment
+## 4. Optional: print-time + filament estimates (PrusaSlicer)
+The parts list (`PARTS.md`) can show **real per-part print time + filament** and
+balance the printer farm by minutes — if PrusaSlicer is available. Export your
+**Original Prusa MK4S** profile once: in PrusaSlicer pick the MK4S 0.4mm profile
++ your filament, then **File → Export → Export Config** → save as
+`pipeline/profiles/mk4s.ini` (or set `PRUSA_CONFIG`). PrusaSlicer is found on
+PATH, at `/Applications/PrusaSlicer.app`, or via `$PRUSA_SLICER`. Without it the
+split just balances by part volume.
+
+## 5. Codex environment
 Make sure Codex's setup step runs `pip install -r requirements.txt` so the
 sandbox has the stack, and that `TRELLIS_DIR` + the TRELLIS-mac install are
 present on the Mac where Codex runs.

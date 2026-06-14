@@ -117,18 +117,19 @@ def split_to_bed(mesh, bed=PRUSA_MK4S, margin=BED_MARGIN,
     return out
 
 
-def _distribute(stats, printers):
-    """Greedy longest-processing-time split across N printers, balanced by volume
-    (a rough proxy for print time until PrusaSlicer gives real numbers)."""
+def _distribute(stats, printers, cost_key="volume_cm3"):
+    """Greedy longest-processing-time split across N printers, balanced by
+    `cost_key` -- sliced seconds when available, else volume."""
     if printers <= 1:
         return None
     load = [0.0] * printers
     plan = [[] for _ in range(printers)]
-    for s in sorted(stats, key=lambda x: x["volume_cm3"], reverse=True):
+    for s in sorted(stats, key=lambda x: x.get(cost_key) or 0.0, reverse=True):
         i = int(np.argmin(load))
         plan[i].append(s["name"])
-        load[i] += s["volume_cm3"]
-    return [{"printer": i + 1, "parts": plan[i], "load_cm3": round(load[i], 1)}
+        load[i] += s.get(cost_key) or 0.0
+    div, unit = (60.0, "min") if cost_key == "time_s" else (1.0, "cm³")
+    return [{"printer": i + 1, "parts": plan[i], "load": round(load[i] / div, 1), "unit": unit}
             for i in range(printers) if plan[i]]
 
 
@@ -145,10 +146,12 @@ def _layout(meshes, gap=8.0):
 
 
 def package_parts(parts, out_dir, design_name="Design", bed=PRUSA_MK4S,
-                  printers=1, assembly_notes="", make_preview=True, split=True):
+                  printers=1, assembly_notes="", make_preview=True, split=True,
+                  do_slice=True, slice_config=None):
     """Export each part + a parts list + a preview. `parts` is {name: mesh|stl_path}
     (or a list of those). Oversize parts are auto-cut to fit the bed when
-    split=True. Returns the manifest dict."""
+    split=True; when do_slice=True and PrusaSlicer + an MK4S config are present,
+    the farm split is balanced by real print minutes. Returns the manifest dict."""
     if not isinstance(parts, dict):
         parts = {f"part{i+1}": p for i, p in enumerate(parts)}
 
@@ -186,6 +189,25 @@ def package_parts(parts, out_dir, design_name="Design", bed=PRUSA_MK4S,
         })
         meshes.append(mesh)
 
+    # Real print-time + filament via PrusaSlicer (optional). When available, the
+    # farm split is balanced by minutes instead of volume.
+    cost_key = "volume_cm3"
+    if do_slice:
+        try:
+            from .slice import estimate_parts
+            est = estimate_parts([os.path.join(out_dir, s["stl"]) for s in stats],
+                                 config=slice_config)
+        except Exception:
+            est = {}
+        for s in stats:
+            if s["name"] in est:
+                s["time_s"] = est[s["name"]]["time_s"]
+                s["filament_g"] = est[s["name"]]["filament_g"]
+        if est and all("time_s" in s for s in stats):
+            cost_key = "time_s"
+    sliced = cost_key == "time_s"
+    farm_plan = _distribute(stats, printers, cost_key)
+
     manifest = {
         "design": design_name,
         "printer": "Prusa MK4S",
@@ -194,7 +216,11 @@ def package_parts(parts, out_dir, design_name="Design", bed=PRUSA_MK4S,
         "parts": stats,
         "oversize": [s["name"] for s in stats if not s["fits_mk4s"]],
         "split_from": split_map,
-        "farm_plan": _distribute(stats, printers),
+        "sliced": sliced,
+        "total_time_min": round(sum(s.get("time_s") or 0 for s in stats) / 60.0, 1) if sliced else None,
+        "total_filament_g": round(sum(s.get("filament_g") or 0 for s in stats), 1) if sliced else None,
+        "wall_clock_min": max((p["load"] for p in farm_plan), default=None) if (sliced and farm_plan) else None,
+        "farm_plan": farm_plan,
         "assembly_notes": assembly_notes,
     }
     with open(os.path.join(out_dir, "parts.json"), "w") as fh:
@@ -215,15 +241,30 @@ def package_parts(parts, out_dir, design_name="Design", bed=PRUSA_MK4S,
 
 
 def _manifest_md(m):
+    from .slice import fmt_minutes
+    sliced = m.get("sliced")
     lines = [f"# Parts to print — {m['design']}",
              f"Printer: **{m['printer']}** (bed {m['bed_mm'][0]:.0f} × {m['bed_mm'][1]:.0f} × {m['bed_mm'][2]:.0f} mm)",
-             "", f"**{m['part_count']} piece(s).**", "",
-             "| Part | Size (mm) | Volume | Fits MK4S? |",
-             "|------|-----------|--------|------------|"]
+             "", f"**{m['part_count']} piece(s).**", ""]
+    if sliced:
+        lines += ["| Part | Size (mm) | Volume | Time | Filament | Fits MK4S? |",
+                  "|------|-----------|--------|------|----------|------------|"]
+    else:
+        lines += ["| Part | Size (mm) | Volume | Fits MK4S? |",
+                  "|------|-----------|--------|------------|"]
     for s in m["parts"]:
         sz = " × ".join(f"{v:.0f}" for v in s["size_mm"])
         fit = "yes" if s["fits_mk4s"] else "**NO — too big, must be split**"
-        lines.append(f"| {s['name']} | {sz} | {s['volume_cm3']} cm³ | {fit} |")
+        if sliced:
+            t = fmt_minutes(s["time_s"] / 60.0) if s.get("time_s") else "—"
+            fil = f"{s['filament_g']:.0f} g" if s.get("filament_g") else "—"
+            lines.append(f"| {s['name']} | {sz} | {s['volume_cm3']} cm³ | {t} | {fil} | {fit} |")
+        else:
+            lines.append(f"| {s['name']} | {sz} | {s['volume_cm3']} cm³ | {fit} |")
+    if sliced:
+        lines += ["", f"**Total: {fmt_minutes(m['total_time_min'])} of printing · {m['total_filament_g']:.0f} g filament.**"]
+        if m.get("wall_clock_min"):
+            lines.append(f"Across your printers in parallel: about **{fmt_minutes(m['wall_clock_min'])}** wall-clock.")
     if m.get("split_from"):
         lines += ["", "## Cut to fit the bed"]
         for name, k in m["split_from"].items():
@@ -233,7 +274,7 @@ def _manifest_md(m):
     if m["farm_plan"]:
         lines += ["", "## Split across your printers"]
         for p in m["farm_plan"]:
-            lines.append(f"- Printer {p['printer']}: {', '.join(p['parts'])}  ({p['load_cm3']} cm³)")
+            lines.append(f"- Printer {p['printer']}: {', '.join(p['parts'])}  ({p['load']} {p['unit']})")
     if m["assembly_notes"]:
         lines += ["", "## How it goes together", m["assembly_notes"]]
     return "\n".join(lines) + "\n"
@@ -245,8 +286,13 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=None, help="output dir (default: parent of first STL's parent)")
     ap.add_argument("--name", default="Design")
     ap.add_argument("--printers", type=int, default=1)
+    ap.add_argument("--config", default=None, help="PrusaSlicer MK4S config .ini (real time/filament)")
+    ap.add_argument("--no-slice", action="store_true", help="skip slicing; balance by volume")
     a = ap.parse_args()
     out = a.out or os.path.dirname(os.path.dirname(os.path.abspath(a.stls[0])))
     parts = {os.path.splitext(os.path.basename(p))[0]: p for p in a.stls}
-    man = package_parts(parts, out, design_name=a.name, printers=a.printers)
-    print(json.dumps({k: man[k] for k in ("part_count", "oversize", "farm_plan")}, indent=2))
+    man = package_parts(parts, out, design_name=a.name, printers=a.printers,
+                        do_slice=not a.no_slice, slice_config=a.config)
+    print(json.dumps({k: man[k] for k in ("part_count", "oversize", "sliced",
+                                          "total_time_min", "total_filament_g", "farm_plan")},
+                     indent=2, default=str))
