@@ -27,6 +27,23 @@ import subprocess
 import sys
 
 
+def _load_dotenv():
+    """Load repo-root .env (written by scripts/setup.sh) so TRELLIS_DIR etc. are
+    available without manual exports. Real env vars take precedence."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(root, ".env")
+    if not os.path.exists(path):
+        return
+    for line in open(path):
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_dotenv()
+
+
 def _python_for(trellis_dir):
     venv_py = os.path.join(trellis_dir, ".venv", "bin", "python")
     return venv_py if os.path.exists(venv_py) else sys.executable

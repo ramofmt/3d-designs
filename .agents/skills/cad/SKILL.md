@@ -5,7 +5,9 @@ description: Design-to-print pipeline. Use whenever the user wants a 3D-printabl
 
 Run this for the object the user described (or sent a photo of) in their task.
 Follow the phases IN ORDER. Never skip the approval gate. Everything runs
-LOCALLY on this Mac — no paid services, no cloud generation.
+LOCALLY on this Mac — no paid services, no cloud generation. Run pipeline
+commands with the repo environment active (`source .venv/bin/activate`); if it
+isn't set up yet, run the setup skill (.agents/skills/setup/SKILL.md) first.
 
 Pick the track first:
 

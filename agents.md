@@ -15,6 +15,12 @@ When showing results, always state plainly: what the object is, its final size,
 the link to spin it around in 3D, and exactly which file he should download to
 print (the .stl file).
 
+First-time setup
+If the user says "set this up here" (or "set up", "install everything"), or this
+is a fresh checkout with no .venv, use the setup skill at
+.agents/skills/setup/SKILL.md. It installs everything locally and turns on the
+3D-preview site. You run it; he only pastes one free token if asked.
+
 Default task: 3D design
 If he describes an object he wants to print — or sends a photo of something to
 recreate — even without typing cad, use the CAD skill at

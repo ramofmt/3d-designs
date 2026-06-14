@@ -4,6 +4,9 @@ venv/
 __pycache__/
 *.py[cod]
 
+# Local machine config (paths/tokens) written by scripts/setup.sh
+.env
+
 # Transient build / generation artifacts
 *.gcode
 generated.glb
