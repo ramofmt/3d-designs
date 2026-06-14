@@ -24,8 +24,12 @@ Ask only what changes the geometry, in ONE short batch, in plain language:
   Ask the real-world SIZE it should be ("how tall, in cm?") and whether it has
   to hold or fit anything (and that object's measurements).
 - Track B: critical dimensions, what it interfaces with (ask for measurements),
-  print orientation. Defaults: FDM 0.4mm nozzle, 0.2mm layers, 2.4mm walls,
-  15% infill. State any defaults you chose.
+  print orientation.
+- Both: is it one piece or several that fit together (base + lid, moving parts)?
+  How do they connect? Each piece prints separately, and anything bigger than the
+  printer bed is auto-split.
+- Defaults: Prusa MK4S, 0.4mm nozzle, 0.2mm layers, 2.4mm walls, 15% infill;
+  several MK4S units are available for parallel printing. State any defaults you chose.
 
 ## Phase 2: Build
 
@@ -38,7 +42,8 @@ TRACK A (from a photo):
    Make it watertight and single-volume; scale so the longest side matches.
 3. Add functional features parametrically with build123d / trimesh (a flat seat,
    a pocket, a hidden cable channel) ONLY if the user asked for them.
-4. Export designs/<slug>/model.stl (and model.step if it is solid CAD).
+4. Export designs/<slug>/model.stl (and model.step if it is solid CAD). It's one
+   piece; if it's bigger than the MK4S bed it gets auto-split in Phase 4.
 
 TRACK B (mechanical):
 1. Write designs/<slug>/model.py — parametric build123d, key dimensions as named
@@ -46,6 +51,9 @@ TRACK B (mechanical):
 2. Run it; export model.stl + model.step.
 3. Validate it is watertight (trimesh.load(...).is_watertight); fix and
    re-export if not.
+4. If it's an assembly, model each piece as its own named solid and keep them as
+   {name: solid_or_stl} for packaging in Phase 4; export the assembled whole to
+   model.stl for the preview.
 
 ## Phase 3: Interactive 3D preview for review
 1. Build the interactive preview (NOT photo renders):
@@ -58,10 +66,18 @@ TRACK B (mechanical):
 
 ## Phase 4: Deliver
 Once approved:
-1. Commit model.stl (and model.step) to designs/<slug>/.
-2. Tell the user — in plain language — what it is, its final size, the suggested
-   print orientation, whether supports are likely, the infill (15% default, more
-   if it bears load), and EXACTLY which file to download to print (the .stl).
+1. Package into printable parts (auto-splits anything bigger than the MK4S bed,
+   adding alignment pins so the pieces line up):
+       python -m pipeline.parts designs/<slug>/parts/*.stl --name "<name>" --printers <N>
+   or call pipeline.parts.package_parts({name: solid_or_stl}, "designs/<slug>",
+   printers=<N>, assembly_notes="...") from the build script. This writes
+   parts/<piece>.stl, PARTS.md (parts list + split-across-printers plan), and
+   parts_preview.html.
+2. Commit and push so the parts list and previews are saved.
+3. Tell the user — in plain language — the pieces and their sizes, which to run on
+   each MK4S unit (the plan in PARTS.md), suggested orientation, supports, infill
+   (15% default, more if load-bearing), and EXACTLY which files to print (every
+   .stl in parts/).
 
 ## Rules
 - Everything is local. Never use a paid or cloud generation service.
