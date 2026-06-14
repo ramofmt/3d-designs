@@ -3,7 +3,7 @@
 Two ways to use it, both from the ChatGPT app on your phone:
 
 1. **Describe a part** — for example:
-   *"cad a phone stand for my iPhone, tilted back a bit, with a slot for the charging cable."*
+   *"$cad a phone stand for my iPhone, tilted back a bit, with a slot for the charging cable."*
 2. **Send a photo** of something you want as a 3D print — a figure, an animal, a
    hand — and say what it's for. It recreates the shape from your picture.
 
