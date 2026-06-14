@@ -1,0 +1,15 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Transient build / generation artifacts
+*.gcode
+generated.glb
+generated.obj
+designs/**/_frames/
+
+# OS junk
+.DS_Store
+Thumbs.db
