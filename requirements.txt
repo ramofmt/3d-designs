@@ -1,0 +1,7 @@
+# CAD + mesh + interactive-viewer stack for the /cad pipeline (runs on the Mac).
+# The image-to-3D model (TRELLIS-mac) installs separately -- see SETUP.md.
+build123d>=0.9        # parametric solid CAD (Apple Silicon has current OCP wheels)
+trimesh>=4.0          # mesh load / repair / GLB export
+manifold3d>=2.0       # robust boolean engine used by trimesh for watertight cleanup
+numpy>=1.26
+Pillow>=10.0          # image handling for photo input
