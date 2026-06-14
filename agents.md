@@ -23,7 +23,7 @@ is a fresh checkout with no .venv, use the setup skill at
 
 Default task: 3D design
 If he describes an object he wants to print — or sends a photo of something to
-recreate — even without typing cad, use the CAD skill at
+recreate — even without typing $cad, use the CAD skill at
 .agents/skills/cad/SKILL.md and follow its pipeline: interview, build, publish
 an interactive 3D preview, wait for approval, then deliver files.
 
